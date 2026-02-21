@@ -124,7 +124,7 @@ def parametercalc(P,V,mu=G*c.M_sun.value):
         ω = 0.0
     return a, e, i, v, ω, Ω
 """
-The parameter function takes position and velocity, both shape (3,) with appropriate units,
+The parametercalc function takes position and velocity, both shape (3,) with appropriate units,
  and an optional gravitational parameter mu (defaulting to G times the solar mass). 
  It calculates the Cartesian position and velocity vectors in a heliocentric frame 
  using the standard formulas for converting orbital elements to Cartesian coordinates. 
@@ -209,8 +209,22 @@ It takes arguments p, v, m, step, func, which all have the same structure as oth
 #Inputs:
 np.random.seed(42)
 
-#Schemes: leapfrog, euler, RK4
+#Schemes: leapfrog, euler, RK4. Initializing loop - independent variables
 integrationscheme = leapfrog
+
+startdatetime = Time.now()
+
+stepadj = 1.1
+simtimeyears = 101 #years, just over the total integration time of 100 years, to ensure we get the final parameters at 100 years.
+#Time should be kept track of if the code is modified - use a set start date. Bringing this outside of the loop allows for a stable start time but this can change if something is edited.
+
+mu = G * c.M_sun.value
+    
+net_time = simtimeyears*31556952
+
+maxtol = 1+energytolerance
+mintol= 1-energytolerance
+    
 
 parameterlist = np.array([[0,0,0,0],
                           [600, 0.5, 30, 10],
@@ -219,12 +233,16 @@ parameterlist = np.array([[0,0,0,0],
                           [520, 0.25, 11, 4.9]])
 #semimaj, eccentricity, inclination, mass (earth masses)
 
+
+
 def kepler(E, e, M):
         return E - e*np.sin(E) - M
 for simnum in range(0,50): #Beginning of loop. Data does not have to be collected in one loop like this, but it was more convient to do so, leaving the computer on overnight for a few days to collect the initial data.
-    #P9 parameters:
+    
     filename = str("Sim(" +str(simnum//10)+ ")(" + str(10+simnum%10) + ")OrbitalElements.npy") #Naming files according to the parameters used, for ease of later analysis. 
     #The first number corresponds to the row of parameterlist, and the second number corresponds to the mass of planet 9 in earth masses (10,20,...,100).
+
+    #P9 Parameters
     semimaj = parameterlist[simnum//10,0]*u.AU
     eccentricity = parameterlist[simnum//10,1]  
     inclination = parameterlist[simnum//10,2]*u.deg
@@ -233,13 +251,11 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
     periapsis = 150*u.deg
     longascending= 113*u.deg
     energytolerance = 10**-8
-    stepadj = 1.1 
-    #assignment and conversion of parameters for planet 9, as well as some parameters for the adaptive timestep mechanism.
-    startdatetime = Time.now()
-    simtimeyears = 101 #years, just over the total integration time of 100 years, to ensure we get the final parameters at 100 years.
+
     #testparticle TNOs:
 
-    i=0
+    #assignment and conversion of parameters for planet 9, as well as some parameters for the adaptive timestep mechanism.
+    
     kbosemimajdist = np.random.uniform(150,550,3200)
     kboperi = np.random.uniform(30,50,3200)
     kboecc = 1-(kboperi/kbosemimajdist)
@@ -248,10 +264,12 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
     inc = halfnorm.rvs(scale=15, size = 3200)
     inc=np.append(inc,[103,110,144])
     rand = np.random.uniform(0, 360, 9609)
-    #randomization of the initial conditions for the 3200 test particles, based on the observed distribution of TNOs, 
-    #as well as some randomization of the angles for planet 9. Follows the process outlined in the paper.
-
-    #semimaj,eccentricity, inclination, trueanomaly, periapsis, longascending (order listed for future calls and returns and copypaste convenience)
+    """
+    randomization of the initial conditions for the 3200 test particles, based on the observed distribution of TNOs, 
+    as well as some randomization of the angles for planet 9. Follows the process outlined in the paper.
+    semimaj,eccentricity, inclination, trueanomaly, periapsis, longascending (order listed for future calls and returns and copypaste convenience)
+    """
+    i=0
     for i in range(len(kbosemimajdist)):
         """
         Calculates the initial position and velocity vectors for each of the 3200 test particles using the orbitcalc function, which converts from orbital elements to Cartesian coordinates.
@@ -335,18 +353,18 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
     m = np.array((m1,m2,m3,m4,m5,m6,m7,m8,m9,m10))
     p = np.vstack((p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,testp))
     v = np.vstack((v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,testv))
-    #Stack arrays into a 2d array for positions and velocities, and a 1d array for masses, to be used as initial conditions for the integration and simplify processes. Will be split later for analysis
-
-    mu = G * c.M_sun.value
+    #Stack arrays into a 2d array for positions and velocities, and a 1d array for masses, 
+    #to be used as initial conditions for the integration and simplify processes. Will be split later for analysis
+    
     net_time = simtimeyears*31556952
-
-    maxtol = 1+energytolerance
-    mintol= 1-energytolerance
+    
     colorlist = ['Yellow','Red','Blue', 'Green', 'Orange', 'Purple', 'Yellow', 'Black', 'Gold', 'Plum']
     namelist = ["Sun", "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Planet 9"]
     #Totally unnecessary for the research, but quite helpful for keeping track of the simulation and making sure it is running correctly, as well as for visualizations and sanity checks.
     step = 0.001* 31556952
+    
     #------------------------------------------------------------------------------------------------------------------------------------------------------
+    
     t=0
     plist = [p.copy()]
     semi1, ecc1, inc1,_,_,_= parametercalc(p2-p1,v2-v1)
@@ -360,14 +378,19 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
     semi9, ecc9, inc9,_,_,_= parametercalc(p10-p1,v10-v1)
     """Calculation of initial parameters for the 9 massive bodies, to be used as the first entry in the array of orbital elements that will be saved and analyzed later.
     Angular elements are ignored."""
+    
     kbosemimajdist =np.append(kbosemimajdist, np.array([semi1,semi2,semi3,semi4,semi5,semi6,semi7,semi8,semi9]))
     kboecc = np.append(np.array([ecc1,ecc2,ecc3,ecc4,ecc5,ecc6,ecc7,ecc8,ecc9]),kboecc)
     inc = np.append(np.array([inc1,inc2,inc3,inc4,inc5,inc6,inc7,inc8,inc9]),inc)
-    """I append the parameters for the 9 massive bodies to the beginning of the arrays for the test particles
+    
+    """
+    I append the parameters for the 9 massive bodies to the beginning of the arrays for the test particles
     so that I can save all of the parameters in one array and not have to worry about splitting them later.
     The names of the variables are a bit misleading, but it was easier to just append them to the end of the arrays I had already created for the test particles, 
-    and then I can just split them later when I want to analyze the parameters for the massive bodies separately."""
-    para = np.vstack((kbosemimajdist, kboecc, inc)) #created a giant parameter array to be saved in one file and analyzed later, with shape (3, 3212, X) = (parameters, particles, time steps)
+    and then I can just split them later when I want to analyze the parameters for the massive bodies separately.
+    """
+    para = np.vstack((kbosemimajdist, kboecc, inc))
+    #created a giant parameter array to be saved in one file and analyzed later, with shape (3, 3212, X) = (parameters, particles, time steps)
     tlist=[0]
     elist = [1]
     i=0
@@ -396,22 +419,29 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
                 passed1 = True
                 tlist.append(listnum)
                 printing = True
-            """This is just a way to save the parameters at specific time intervals (1 year, 10 years, 30 years, 100 years) 
+            
+            """
+            This is just a way to save the parameters at specific time intervals (1 year, 10 years, 30 years, 100 years) 
             as well as every 200 steps, to ensure that I have enough data points to analyze the evolution of the system over time,
             Printing the location in the final parameter array where the parameters at these specific time intervals are saved, 
             ensuring that I can accuately analyze the parameters at these time intervals later
-            I also used this to ensure that the simulation was running correctly, as it let me know as simulations were being run and if energy was being conserved."""
+            I also used this to ensure that the simulation was running correctly, as it let me know as simulations were being run and if energy was being conserved.
+            """
+            
             listnum += 1
             arrsemimaj = np.zeros(p.shape[0] - 1)
             arreccentricity = np.zeros(p.shape[0] - 1)
             arrinclination = np.zeros(p.shape[0] - 1)
+            
             for jj in range (1,p.shape[0]):
                 semimaj, eccentricity, inclination, _,_,_= parametercalc(p[jj,:]-p[0,:],v[jj,:]-v[0,:])
                 arreccentricity[jj-1] = eccentricity
                 arrinclination[jj-1] = inclination
                 arrsemimaj[jj-1] = semimaj
+            
             para1step = np.vstack((arrsemimaj,arreccentricity,arrinclination))
             para = np.dstack((para,para1step))
+            
             #Collection of new parameters and adding to the data
             if printing ==True:
                 print(str(i) + " Steps Complete: " + str(t*100/net_time) + "% of Time Completed. Energy Accuracy: " + str(100*energy(p,v,m)/estart)+ "% of Original")
@@ -422,19 +452,25 @@ for simnum in range(0,50): #Beginning of loop. Data does not have to be collecte
     arrsemimaj      = np.zeros(p.shape[0] - 1)
     arreccentricity = np.zeros(p.shape[0] - 1)
     arrinclination  = np.zeros(p.shape[0] - 1)
-    for jj in range(p.shape[0] - 1):
+    
+    for jj in range(p.shape[0] - 1): 
         semimaj, eccentricity, inclination, _,_,_ = parametercalc(p[jj+1,:] - p[0,:], v[jj+1,:] - v[0,:])
         arrsemimaj[jj]= semimaj
         arreccentricity[jj] = eccentricity
         arrinclination[jj]  = inclination
+        
     para1step = np.vstack((arrsemimaj, arreccentricity, arrinclination))
     para = np.dstack((para, para1step))
     #Final data collection.
+    
     #-------------------------------------------------------------------------------------------------------------------------------------------------------
+    
     print("Sim Number " + str(simnum) + " complete. Total Steps:" + str(i) + ", Final Energy Accuracy:" + str(100*energy(p,v,m)/estart) + "% of Original")
     print(tlist)
     np.save(filename, para) 
-    # shape is (3, 3212, X) = (parameters, particles, time steps)
+    #shape is (3, 3212, X) = (parameters, particles, time steps)
 
 endtime = time.time()
-print("Total Runtime: " + str(endtime - starttime) + " seconds") #Just to make sure I know how long the simulations are taking, as they took a very long time.
+
+print("Total Runtime: " + str(endtime - starttime) + " seconds") 
+#Just to make sure I know how long the simulations are taking, as they took a very long time.
